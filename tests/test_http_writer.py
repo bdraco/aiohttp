@@ -236,7 +236,19 @@ async def test_write_to_closing_transport(protocol, transport, loop) -> None:
         await msg.write(b"After closing")
 
 
-async def test_drain(protocol, transport, loop) -> None:
+async def test_write_to_closed_transport(
+    protocol: Any, transport: Any, loop: Any
+) -> None:
+    msg = http.StreamWriter(protocol, loop)
+
+    await msg.write(b"Before transport close")
+    protocol.transport = None
+
+    with pytest.raises(ConnectionResetError):
+        await msg.write(b"After transport closed")
+
+
+async def test_drain(protocol: Any, transport: Any, loop: Any) -> None:
     msg = http.StreamWriter(protocol, loop)
     await msg.drain()
     assert protocol._drain_helper.called
