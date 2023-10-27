@@ -731,7 +731,7 @@ class HttpPayloadParser:
             real_payload = payload
 
         # payload parser
-        if not response_with_body or code in (204, 304) or 100 <= code < 200:
+        if not response_with_body or code in (204, 304) or (code and 100 <= code < 200):
             # don't parse payload if it's not expected to be received
             # 204, 304, 1xx should not have a body per
             # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
