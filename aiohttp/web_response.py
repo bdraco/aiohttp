@@ -380,14 +380,8 @@ class StreamResponse(BaseClass, HeadersMixin, CookieMixin):
             #
             if hdrs.TRANSFER_ENCODING in headers:
                 del headers[hdrs.TRANSFER_ENCODING]
-            # HTTP 1.0: https://tools.ietf.org/html/rfc1945#section-10.4
-            # 0 is not a valid value for Content-Length header for HTTP/1.0
             if hdrs.CONTENT_LENGTH in headers:
                 del headers[hdrs.CONTENT_LENGTH]
-            # HTTP 1.1: https://tools.ietf.org/html/rfc7230#section-3.3.2
-            # 0 is a valid value for Content-Length header for HTTP/1.1
-            if version >= HttpVersion11:
-                headers[hdrs.CONTENT_LENGTH] = "0"
         elif self._chunked:
             if version != HttpVersion11:
                 raise RuntimeError(
