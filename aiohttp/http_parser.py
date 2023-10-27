@@ -341,9 +341,15 @@ class HttpParser(abc.ABC, Generic[_MsgT]):
 
                         assert self.protocol is not None
                         # calculate payload
+                        # 204, 304, 1xx should not have a body per
+                        # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
                         if (
                             (length is not None and length > 0)
-                            or msg.chunked
+                            or (
+                                msg.chunked
+                                and self.code not in (204, 304)
+                                and not (self.code and 100 <= self.code < 200)
+                            )
                             and not msg.upgrade
                         ):
                             payload = StreamReader(
@@ -731,10 +737,8 @@ class HttpPayloadParser:
             real_payload = payload
 
         # payload parser
-        if not response_with_body or code in (204, 304) or (code and 100 <= code < 200):
+        if not response_with_body:
             # don't parse payload if it's not expected to be received
-            # 204, 304, 1xx should not have a body per
-            # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
             self._type = ParseState.PARSE_NONE
             real_payload.feed_eof()
             self.done = True
