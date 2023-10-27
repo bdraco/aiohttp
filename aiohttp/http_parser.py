@@ -338,13 +338,14 @@ class HttpParser(abc.ABC, Generic[_MsgT]):
                         self._upgraded = msg.upgrade
 
                         method = getattr(msg, "method", self.method)
+                        code = getattr(msg, "code", 100)
 
                         assert self.protocol is not None
                         # calculate payload
                         # 204, 304, 1xx should not have a body per
                         # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
-                        code_indicates_empty_body = self.code in (204, 304) or (
-                            self.code and 100 <= self.code < 200
+                        code_indicates_empty_body = (
+                            code in (204, 304) or 100 <= code < 200
                         )
                         if (
                             (length is not None and length > 0)
