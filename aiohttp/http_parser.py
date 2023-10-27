@@ -731,7 +731,7 @@ class HttpPayloadParser:
             real_payload = payload
 
         # payload parser
-        if not response_with_body:
+        if not response_with_body or code in (204, 304) or 100 <= code < 200:
             # don't parse payload if it's not expected to be received
             self._type = ParseState.PARSE_NONE
             real_payload.feed_eof()
