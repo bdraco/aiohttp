@@ -624,6 +624,22 @@ async def test_rm_content_length_if_compression_http10() -> None:
     assert resp.content_length is None
 
 
+async def test_rm_transfer_encoding_rfc_9112_6_3() -> None:
+    """Remove transfer encoding for RFC 9112 sec 6.3."""
+    writer = mock.Mock()
+
+    async def write_headers(status_line, headers):
+        assert hdrs.CONTENT_LENGTH not in headers
+        assert hdrs.TRANSFER_ENCODING not in headers
+
+    writer.write_headers.side_effect = write_headers
+    req = make_request("GET", "/", version=HttpVersion11, writer=writer)
+    resp = Response(body=BytesPayload(b"answer"))
+    resp.enable_compression(ContentCoding.gzip)
+    await resp.prepare(req)
+    assert resp.content_length is None
+
+
 async def test_content_length_on_chunked() -> None:
     req = make_request("GET", "/")
     resp = Response(body=b"answer")

@@ -364,7 +364,31 @@ class StreamResponse(BaseClass, HeadersMixin, CookieMixin):
         if self._compression:
             await self._start_compression(request)
 
-        if self._chunked:
+        if self.status in (204, 304) or 100 >= self.status < 200:
+            #
+            # Remove transfer-encoding since there is no body
+            # and this can confuse some clients (e.g. older aiohttp)
+            #
+            # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
+            #
+            # Any response to a HEAD request and any response with
+            # a 1xx (Informational), 204 (No Content), or 304
+            # (Not Modified) status code is always terminated by
+            # the first empty line after the header fields,
+            # regardless of the header fields present in the message,
+            # and thus cannot contain a message body or trailer section.
+            #
+            if hdrs.TRANSFER_ENCODING in headers:
+                del headers[hdrs.TRANSFER_ENCODING]
+            # HTTP 1.0: https://tools.ietf.org/html/rfc1945#section-10.4
+            # 0 is not a valid value for Content-Length header for HTTP/1.0
+            if hdrs.CONTENT_LENGTH in headers:
+                del headers[hdrs.CONTENT_LENGTH]
+            # HTTP 1.1: https://tools.ietf.org/html/rfc7230#section-3.3.2
+            # 0 is a valid value for Content-Length header for HTTP/1.1
+            if version >= HttpVersion11:
+                headers[hdrs.CONTENT_LENGTH] = "0"
+        elif self._chunked:
             if version != HttpVersion11:
                 raise RuntimeError(
                     "Using chunked encoding is forbidden "
