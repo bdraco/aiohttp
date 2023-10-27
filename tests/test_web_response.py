@@ -638,7 +638,7 @@ async def test_rm_transfer_encoding_rfc_9112_6_3_http_11(status: int) -> None:
     resp = Response(status=status)
     resp.enable_chunked_encoding()
     await resp.prepare(req)
-    assert resp.content_length == "0"
+    assert resp.content_length is None
     assert not resp.chunked
 
 
