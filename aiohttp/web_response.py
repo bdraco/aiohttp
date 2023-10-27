@@ -366,8 +366,8 @@ class StreamResponse(BaseClass, HeadersMixin, CookieMixin):
 
         if self.status in (204, 304) or 100 >= self.status < 200:
             #
-            # Remove transfer-encoding since there is no body
-            # and this can confuse some clients (e.g. older aiohttp)
+            # Remove transfer-encoding/content-length since there is no
+            # body and this can confuse some clients (e.g. older aiohttp)
             #
             # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
             #
