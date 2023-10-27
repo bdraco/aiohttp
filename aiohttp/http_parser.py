@@ -343,13 +343,12 @@ class HttpParser(abc.ABC, Generic[_MsgT]):
                         # calculate payload
                         # 204, 304, 1xx should not have a body per
                         # https://datatracker.ietf.org/doc/html/rfc9112#section-6.3
+                        code_indicates_empty_body = self.code in (204, 304) or (
+                            self.code and 100 <= self.code < 200
+                        )
                         if (
                             (length is not None and length > 0)
-                            or (
-                                msg.chunked
-                                and self.code not in (204, 304)
-                                and not (self.code and 100 <= self.code < 200)
-                            )
+                            or (msg.chunked and not code_indicates_empty_body)
                             and not msg.upgrade
                         ):
                             payload = StreamReader(
@@ -391,7 +390,7 @@ class HttpParser(abc.ABC, Generic[_MsgT]):
                             )
                         else:
                             if (
-                                getattr(msg, "code", 100) >= 199
+                                not code_indicates_empty_body
                                 and length is None
                                 and self.read_until_eof
                             ):
