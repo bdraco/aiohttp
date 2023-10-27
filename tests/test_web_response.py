@@ -652,7 +652,7 @@ async def test_rm_transfer_encoding_rfc_9112_6_3_http_10(status: int) -> None:
         assert hdrs.TRANSFER_ENCODING not in headers
 
     writer.write_headers.side_effect = write_headers
-    req = make_request("GET", "/", version=HttpVersion11, writer=writer)
+    req = make_request("GET", "/", version=HttpVersion10, writer=writer)
     resp = Response(status=status)
     resp.enable_chunked_encoding()
     await resp.prepare(req)
