@@ -624,8 +624,27 @@ async def test_rm_content_length_if_compression_http10() -> None:
     assert resp.content_length is None
 
 
-async def test_rm_transfer_encoding_rfc_9112_6_3() -> None:
-    """Remove transfer encoding for RFC 9112 sec 6.3."""
+@pytest.mark.parametrize("status", (100, 101, 204, 304))
+async def test_rm_transfer_encoding_rfc_9112_6_3_http_11(status: int) -> None:
+    """Remove transfer encoding for RFC 9112 sec 6.3 with HTTP/1.1."""
+    writer = mock.Mock()
+
+    async def write_headers(status_line, headers):
+        assert headers[hdrs.CONTENT_LENGTH] == "0"
+        assert hdrs.TRANSFER_ENCODING not in headers
+
+    writer.write_headers.side_effect = write_headers
+    req = make_request("GET", "/", version=HttpVersion11, writer=writer)
+    resp = Response(status=status)
+    resp.enable_chunked_encoding()
+    await resp.prepare(req)
+    assert resp.content_length == "0"
+    assert not resp.chunked
+
+
+@pytest.mark.parametrize("status", (100, 101, 204, 304))
+async def test_rm_transfer_encoding_rfc_9112_6_3_http_10(status: int) -> None:
+    """Remove transfer encoding for RFC 9112 sec 6.3 with HTTP/1.0."""
     writer = mock.Mock()
 
     async def write_headers(status_line, headers):
@@ -634,10 +653,11 @@ async def test_rm_transfer_encoding_rfc_9112_6_3() -> None:
 
     writer.write_headers.side_effect = write_headers
     req = make_request("GET", "/", version=HttpVersion11, writer=writer)
-    resp = Response(body=BytesPayload(b"answer"))
-    resp.enable_compression(ContentCoding.gzip)
+    resp = Response(status=status)
+    resp.enable_chunked_encoding()
     await resp.prepare(req)
     assert resp.content_length is None
+    assert not resp.chunked
 
 
 async def test_content_length_on_chunked() -> None:
