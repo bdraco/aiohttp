@@ -388,34 +388,33 @@ class HttpParser(abc.ABC, Generic[_MsgT]):
                                 auto_decompress=self._auto_decompress,
                                 lax=self.lax,
                             )
+                        elif (
+                            not code_indicates_empty_body
+                            and length is None
+                            and self.read_until_eof
+                        ):
+                            payload = StreamReader(
+                                self.protocol,
+                                timer=self.timer,
+                                loop=loop,
+                                limit=self._limit,
+                            )
+                            payload_parser = HttpPayloadParser(
+                                payload,
+                                length=length,
+                                chunked=msg.chunked,
+                                method=method,
+                                compression=msg.compression,
+                                code=self.code,
+                                readall=True,
+                                response_with_body=self.response_with_body,
+                                auto_decompress=self._auto_decompress,
+                                lax=self.lax,
+                            )
+                            if not payload_parser.done:
+                                self._payload_parser = payload_parser
                         else:
-                            if (
-                                not code_indicates_empty_body
-                                and length is None
-                                and self.read_until_eof
-                            ):
-                                payload = StreamReader(
-                                    self.protocol,
-                                    timer=self.timer,
-                                    loop=loop,
-                                    limit=self._limit,
-                                )
-                                payload_parser = HttpPayloadParser(
-                                    payload,
-                                    length=length,
-                                    chunked=msg.chunked,
-                                    method=method,
-                                    compression=msg.compression,
-                                    code=self.code,
-                                    readall=True,
-                                    response_with_body=self.response_with_body,
-                                    auto_decompress=self._auto_decompress,
-                                    lax=self.lax,
-                                )
-                                if not payload_parser.done:
-                                    self._payload_parser = payload_parser
-                            else:
-                                payload = EMPTY_PAYLOAD
+                            payload = EMPTY_PAYLOAD
 
                         messages.append((msg, payload))
                 else:
