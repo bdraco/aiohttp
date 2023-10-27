@@ -364,7 +364,7 @@ class StreamResponse(BaseClass, HeadersMixin, CookieMixin):
         if self._compression:
             await self._start_compression(request)
 
-        if self.status in (204, 304) or 100 >= self.status < 200:
+        if self.status in (204, 304) or 100 <= self.status < 200:
             #
             # Remove transfer-encoding/content-length since there is no
             # body and this can confuse some clients (e.g. older aiohttp)

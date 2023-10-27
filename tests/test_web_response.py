@@ -637,7 +637,7 @@ async def test_rm_transfer_encoding_rfc_9112_6_3_http_11(status: int) -> None:
     req = make_request("GET", "/", version=HttpVersion11, writer=writer)
     resp = Response(status=status, headers={hdrs.TRANSFER_ENCODING: "chunked"})
     await resp.prepare(req)
-    assert resp.content_length is None
+    assert resp.content_length == 0
     assert not resp.chunked
 
 
