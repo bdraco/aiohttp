@@ -630,7 +630,7 @@ async def test_rm_transfer_encoding_rfc_9112_6_3_http_11(status: int) -> None:
     writer = mock.Mock()
 
     async def write_headers(status_line, headers):
-        assert headers[hdrs.CONTENT_LENGTH] == "0"
+        assert hdrs.CONTENT_LENGTH not in headers
         assert hdrs.TRANSFER_ENCODING not in headers
 
     writer.write_headers.side_effect = write_headers
