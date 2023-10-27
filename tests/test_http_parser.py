@@ -1162,7 +1162,7 @@ def test_parse_chunked_payload_empty_body_than_another_chunked(
     assert not msg.upgrade
     assert msg.chunked
     assert payload.is_eof()
-    assert b"" == b"".join(d for d in payload._buffer)
+    assert not hasattr(payload, "_buffer")
 
     text = (
         b"HTTP/1.1 200 OK\r\n"
