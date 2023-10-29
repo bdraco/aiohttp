@@ -32,9 +32,11 @@ from .helpers import (
     QUOTED_ETAG_RE,
     ETag,
     HeadersMixin,
+    must_be_empty_body,
     parse_http_date,
     rfc822_formatted_time,
     sentinel,
+    should_remove_content_length,
     validate_etag_value,
 )
 from .http import RESPONSES, SERVER_SOFTWARE, HttpVersion10, HttpVersion11
@@ -94,6 +96,7 @@ class StreamResponse(BaseClass, HeadersMixin):
         self._req: Optional[BaseRequest] = None
         self._payload_writer: Optional[AbstractStreamWriter] = None
         self._eof_sent = False
+        self._must_be_empty_body: Optional[bool] = None
         self._body_length = 0
         self._state: Dict[str, Any] = {}
 
@@ -417,7 +420,7 @@ class StreamResponse(BaseClass, HeadersMixin):
             return None
         if self._payload_writer is not None:
             return self._payload_writer
-
+        self._must_be_empty_body = must_be_empty_body(request.method, self.status)
         return await self._start(request)
 
     async def _start(self, request: "BaseRequest") -> AbstractStreamWriter:
@@ -456,26 +459,33 @@ class StreamResponse(BaseClass, HeadersMixin):
                     "Using chunked encoding is forbidden "
                     "for HTTP/{0.major}.{0.minor}".format(request.version)
                 )
-            writer.enable_chunking()
-            headers[hdrs.TRANSFER_ENCODING] = "chunked"
+            if not self._must_be_empty_body:
+                writer.enable_chunking()
+                headers[hdrs.TRANSFER_ENCODING] = "chunked"
             if hdrs.CONTENT_LENGTH in headers:
                 del headers[hdrs.CONTENT_LENGTH]
         elif self._length_check:
             writer.length = self.content_length
             if writer.length is None:
-                if version >= HttpVersion11 and self.status != 204:
-                    writer.enable_chunking()
-                    headers[hdrs.TRANSFER_ENCODING] = "chunked"
-                    if hdrs.CONTENT_LENGTH in headers:
-                        del headers[hdrs.CONTENT_LENGTH]
-                else:
+                if version >= HttpVersion11:
+                    if not self._must_be_empty_body:
+                        writer.enable_chunking()
+                        headers[hdrs.TRANSFER_ENCODING] = "chunked"
+                elif not self._must_be_empty_body:
                     keep_alive = False
-            # HTTP 1.1: https://tools.ietf.org/html/rfc7230#section-3.3.2
-            # HTTP 1.0: https://tools.ietf.org/html/rfc1945#section-10.4
-            elif version >= HttpVersion11 and self.status in (100, 101, 102, 103, 204):
-                del headers[hdrs.CONTENT_LENGTH]
 
-        if self.status not in (204, 304):
+        # HTTP 1.1: https://tools.ietf.org/html/rfc7230#section-3.3.2
+        # HTTP 1.0: https://tools.ietf.org/html/rfc1945#section-10.4
+        if self._must_be_empty_body:
+            if hdrs.CONTENT_LENGTH in headers and should_remove_content_length(
+                request.method, self.status
+            ):
+                del headers[hdrs.CONTENT_LENGTH]
+            # remove transfer codings when they are not needed
+            # per https://datatracker.ietf.org/doc/html/rfc9112#section-6.1
+            if version >= HttpVersion11 and hdrs.TRANSFER_ENCODING in headers:
+                del headers[hdrs.TRANSFER_ENCODING]
+        else:
             headers.setdefault(hdrs.CONTENT_TYPE, "application/octet-stream")
         headers.setdefault(hdrs.DATE, rfc822_formatted_time())
         headers.setdefault(hdrs.SERVER, SERVER_SOFTWARE)
@@ -742,7 +752,7 @@ class Response(StreamResponse):
         assert self._req is not None
         assert self._payload_writer is not None
         if body is not None:
-            if self._req._method == hdrs.METH_HEAD or self._status in [204, 304]:
+            if self._must_be_empty_body:
                 await super().write_eof()
             elif self._body_payload:
                 payload = cast(Payload, body)
@@ -754,12 +764,19 @@ class Response(StreamResponse):
             await super().write_eof()
 
     async def _start(self, request: "BaseRequest") -> AbstractStreamWriter:
-        if not self._chunked and hdrs.CONTENT_LENGTH not in self._headers:
-            if not self._body_payload:
-                if self._body is not None:
-                    self._headers[hdrs.CONTENT_LENGTH] = str(len(self._body))
-                else:
-                    self._headers[hdrs.CONTENT_LENGTH] = "0"
+        if self._must_be_empty_body and should_remove_content_length(
+            request.method, self.status
+        ):
+            if hdrs.CONTENT_LENGTH in self._headers:
+                del self._headers[hdrs.CONTENT_LENGTH]
+        elif not self._chunked and hdrs.CONTENT_LENGTH not in self._headers:
+            if self._body_payload:
+                size = cast(Payload, self._body).size
+                if size is not None:
+                    self._headers[hdrs.CONTENT_LENGTH] = str(size)
+            else:
+                body_len = len(self._body) if self._body else "0"
+                self._headers[hdrs.CONTENT_LENGTH] = str(body_len)
 
         return await super()._start(request)
 

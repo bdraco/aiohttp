@@ -14,7 +14,11 @@ from multidict import MultiDict
 from yarl import URL
 
 from aiohttp import helpers
-from aiohttp.helpers import parse_http_date
+from aiohttp.helpers import (
+    must_be_empty_body,
+    parse_http_date,
+    should_remove_content_length,
+)
 
 IS_PYPY = platform.python_implementation() == "PyPy"
 
@@ -783,3 +787,27 @@ def test_netrc_from_home_does_not_raise_if_access_denied(
     monkeypatch.delenv("NETRC", raising=False)
 
     helpers.netrc_from_env()
+
+
+def test_should_remove_content_length_is_subset_of_must_be_empty_body():
+    """Test should_remove_content_length is always a subset of must_be_empty_body."""
+    assert should_remove_content_length("GET", 101) is True
+    assert must_be_empty_body("GET", 101) is True
+
+    assert should_remove_content_length("GET", 102) is True
+    assert must_be_empty_body("GET", 102) is True
+
+    assert should_remove_content_length("GET", 204) is True
+    assert must_be_empty_body("GET", 204) is True
+
+    assert should_remove_content_length("GET", 204) is True
+    assert must_be_empty_body("GET", 204) is True
+
+    assert should_remove_content_length("GET", 200) is False
+    assert must_be_empty_body("GET", 200) is False
+
+    assert should_remove_content_length("HEAD", 200) is False
+    assert must_be_empty_body("HEAD", 200) is True
+
+    assert should_remove_content_length("CONNECT", 200) is True
+    assert must_be_empty_body("CONNECT", 200) is True
