@@ -141,7 +141,9 @@ pyenchant==3.2.2
 pygments==2.15.1
     # via sphinx
 pyjwt==2.8.0
-    # via gidgethub
+    # via
+    #   gidgethub
+    #   pyjwt
 pyproject-hooks==1.0.0
     # via build
 pytest==7.4.3
@@ -156,7 +158,7 @@ pytest-mock==3.12.0
     # via -r requirements/test.in
 python-dateutil==2.8.2
     # via time-machine
-python-on-whales==0.65.0
+python-on-whales==0.66.0
     # via -r requirements/test.in
 pytz==2023.3.post1
     # via babel
