@@ -588,6 +588,7 @@ class ClientRequest:
                 await writer.drain()
                 await self._continue
             except asyncio.CancelledError:
+                raise RuntimeError("Writing data failed: request was cancelled")
                 return
 
         protocol = conn.protocol
