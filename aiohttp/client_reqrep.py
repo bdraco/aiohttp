@@ -1044,6 +1044,7 @@ class ClientResponse(HeadersMixin):
                 self._connection.release()
                 self._connection = None
             else:
+                raise RuntimeError("writer is not done")
                 self._writer.add_done_callback(
                     self._cleanup_writer_and_release_connection
                 )
