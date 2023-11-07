@@ -3,6 +3,7 @@ import codecs
 import contextlib
 import functools
 import io
+import logging
 import re
 import sys
 import traceback
@@ -63,6 +64,8 @@ from .typedefs import (
     LooseHeaders,
     RawHeaders,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 try:
     import ssl
@@ -588,6 +591,7 @@ class ClientRequest:
                 await writer.drain()
                 await self._continue
             except asyncio.CancelledError:
+                _LOGGER.warning("100 Continue response was not received")
                 raise RuntimeError("Writing data failed: request was cancelled")
                 return
 
