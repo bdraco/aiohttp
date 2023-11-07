@@ -984,6 +984,7 @@ class ClientResponse(HeadersMixin):
                 self._connection.release()
                 self._connection = None
             else:
+                raise RuntimeError("writer is not none")
                 self._writer.add_done_callback(self._cleanup_on_writer_done)
 
     async def _wait_released(self) -> None:
