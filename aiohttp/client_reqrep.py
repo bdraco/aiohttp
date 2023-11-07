@@ -971,9 +971,6 @@ class ClientResponse(HeadersMixin):
         if self._closed:
             return
 
-        self._closed = True
-        self._cleanup_writer()
-
         if self._connection is not None:
             # websocket, protocol could be None because
             # connection could be detached
@@ -983,7 +980,12 @@ class ClientResponse(HeadersMixin):
             ):
                 return
 
+            self._cleanup_writer()
             self._release_connection()
+        else:
+            self._cleanup_writer()
+
+        self._closed = True
 
     @property
     def closed(self) -> bool:
