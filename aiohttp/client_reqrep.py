@@ -1075,8 +1075,8 @@ class ClientResponse(HeadersMixin):
 
     def _cleanup_writer(self) -> None:
         if self._writer is not None:
-            if not self._writer.done():
-                self._writer.cancel()
+            assert not self._writer.done()
+            self._writer.cancel()
         self._session = None
 
     def _notify_content(self) -> None:
