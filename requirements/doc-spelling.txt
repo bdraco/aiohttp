@@ -80,7 +80,7 @@ sphinxcontrib-towncrier==0.3.2a0
     # via -r requirements/doc.in
 tomli==2.0.1
     # via towncrier
-towncrier==23.10.0
+towncrier==23.11.0
     # via
     #   -r requirements/doc.in
     #   sphinxcontrib-towncrier
@@ -95,6 +95,4 @@ zipp==3.17.0
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==68.0.0
-    # via
-    #   blockdiag
-    #   sphinx
+    # via blockdiag
