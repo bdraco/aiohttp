@@ -5,6 +5,7 @@ import os
 import pathlib
 import platform
 import ssl
+import warnings
 from re import match as match_regex
 from typing import Any
 from unittest import mock
@@ -67,6 +68,7 @@ def secure_proxy_url(tls_certificate_pem_path):
         tls_certificate_pem_path,  # contains both key and cert
     ]
 
+    warnings.filterwarnings("ignore")
     with proxy.Proxy(input_args=proxypy_args) as proxy_instance:
         yield URL.build(
             scheme="https",
