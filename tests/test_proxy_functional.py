@@ -110,7 +110,6 @@ async def secure_proxy_url(tls_certificate_pem_path):
     )
     proc.terminate()
     await loop.run_in_executor(None, proc.communicate)
-    del proc
 
 
 @pytest.fixture
