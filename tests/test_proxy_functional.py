@@ -4,14 +4,14 @@ import functools
 import os
 import pathlib
 import platform
+import re
 import ssl
-import warnings
+import sys
 from re import match as match_regex
 from typing import Any
 from unittest import mock
 from uuid import uuid4
 
-import proxy
 import pytest
 from yarl import URL
 
@@ -19,6 +19,12 @@ import aiohttp
 from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionError
 from aiohttp.helpers import PY_310
+
+if sys.version_info >= (3, 11):
+    import asyncio as async_timeout
+else:
+    import async_timeout
+
 
 pytestmark = [
     pytest.mark.filterwarnings(
@@ -49,32 +55,56 @@ ASYNCIO_SUPPORTS_TLS_IN_TLS = hasattr(
 
 
 @pytest.fixture
-def secure_proxy_url(tls_certificate_pem_path):
+async def secure_proxy_url(tls_certificate_pem_path):
     """Return the URL of an instance of a running secure proxy.
 
     This fixture also spawns that instance and tears it down after the test.
     """
+    host = "127.0.0.1"
     proxypy_args = [
         "--threadless",  # use asyncio
         "--num-workers",
         "1",  # the tests only send one query anyway
         "--hostname",
-        "127.0.0.1",  # network interface to listen to
+        host,  # network interface to listen to
         "--port",
-        0,  # ephemeral port, so that kernel allocates a free one
+        "0",  # ephemeral port, so that kernel allocates a free one
         "--cert-file",
         tls_certificate_pem_path,  # contains both key and cert
         "--key-file",
         tls_certificate_pem_path,  # contains both key and cert
     ]
 
-    warnings.filterwarnings("ignore")
-    with proxy.Proxy(input_args=proxypy_args) as proxy_instance:
-        yield URL.build(
-            scheme="https",
-            host=str(proxy_instance.flags.hostname),
-            port=proxy_instance.flags.port,
-        )
+    # We run the proxy in a subprocess since its not expected
+    # to be run under pytest, and we do not want to test it for
+    # warnings
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "proxy",
+        *proxypy_args,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+        close_fds=False,
+    )
+    port = 0
+    async with async_timeout.timeout(2):
+        while not port:
+            line_str = (await proc.stderr.readline()).decode()
+            maybe_match = re.search(f"{host}:([0-9]+)", line_str)
+            if maybe_match:
+                port = int(maybe_match.group(1))
+
+    yield URL.build(
+        scheme="https",
+        host=host,
+        port=int(port),
+    )
+    proc.terminate()
+    if proc:
+        await proc.communicate()
+    del proc
 
 
 @pytest.fixture
