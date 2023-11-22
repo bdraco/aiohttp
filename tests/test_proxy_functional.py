@@ -88,6 +88,12 @@ async def secure_proxy_url(tls_certificate_pem_path):
         stderr=asyncio.subprocess.PIPE,
         close_fds=False,
     )
+    # We scrape the ephemeral port that the proxy
+    # chose out of the log. We could set it before
+    # but there would always be a race condition where
+    # another process running on the system might grab
+    # the port before the proxy can which would cause
+    # a random failure
     port = 0
     async with async_timeout.timeout(2):
         while not port:
