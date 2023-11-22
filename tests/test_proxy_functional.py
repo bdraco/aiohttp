@@ -6,6 +6,7 @@ import pathlib
 import platform
 import re
 import ssl
+import subprocess
 import sys
 from re import match as match_regex
 from typing import Any
@@ -74,20 +75,21 @@ async def secure_proxy_url(tls_certificate_pem_path):
         "--key-file",
         tls_certificate_pem_path,  # contains both key and cert
     ]
+    loop = asyncio.get_running_loop()
 
     # We run the proxy in a subprocess since its not expected
     # to be run under pytest, and we do not want to test it for
     # warnings
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-m",
-        "proxy",
-        *proxypy_args,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.PIPE,
-        close_fds=False,
-    )
+    def _make_process() -> subprocess.Popen[Any]:
+        return subprocess.Popen(
+            [sys.executable, "-m", "proxy", *proxypy_args],
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+            close_fds=False,
+        )
+
+    proc = await loop.run_in_executor(None, _make_process)
     # We scrape the ephemeral port that the proxy
     # chose out of the log. We could set it before
     # but there would always be a race condition where
@@ -97,7 +99,7 @@ async def secure_proxy_url(tls_certificate_pem_path):
     port = 0
     async with async_timeout.timeout(2):
         while not port:
-            line_str = (await proc.stderr.readline()).decode()
+            line_str = (await loop.run_in_executor(None, proc.stderr.readline)).decode()
             maybe_match = re.search(f"{host}:([0-9]+)", line_str)
             if maybe_match:
                 port = int(maybe_match.group(1))
@@ -108,7 +110,7 @@ async def secure_proxy_url(tls_certificate_pem_path):
         port=int(port),
     )
     proc.terminate()
-    await proc.communicate()
+    await loop.run_in_executor(None, proc.communicate)
     del proc
 
 
