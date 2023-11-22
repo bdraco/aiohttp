@@ -108,8 +108,7 @@ async def secure_proxy_url(tls_certificate_pem_path):
         port=int(port),
     )
     proc.terminate()
-    if proc:
-        await proc.communicate()
+    await proc.communicate()
     del proc
 
 
