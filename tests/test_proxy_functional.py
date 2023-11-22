@@ -4,11 +4,10 @@ import functools
 import os
 import pathlib
 import platform
-import re
 import ssl
 import subprocess
 import sys
-from re import match as match_regex
+from re import match as match_regex, search as search_regex
 from typing import Any
 from unittest import mock
 from uuid import uuid4
@@ -100,7 +99,7 @@ async def secure_proxy_url(tls_certificate_pem_path):
     async with async_timeout.timeout(2):
         while not port:
             line_str = (await loop.run_in_executor(None, proc.stderr.readline)).decode()
-            maybe_match = re.search(f"{host}:([0-9]+)", line_str)
+            maybe_match = search_regex(f"{host}:([0-9]+)", line_str)
             if maybe_match:
                 port = int(maybe_match.group(1))
 
