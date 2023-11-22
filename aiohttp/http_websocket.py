@@ -619,6 +619,7 @@ class WebSocketWriter:
         self._limit = limit
         self._output_size = 0
         self._compressobj: Any = None  # actually compressobj
+        self._compress_lock: Optional[asyncio.Lock] = None
 
     async def _send_frame(
         self, message: bytes, opcode: int, compress: Optional[int] = None
@@ -635,28 +636,49 @@ class WebSocketWriter:
         if (compress or self.compress) and opcode < 8:
             if compress:
                 # Do not set self._compress if compressing is for this frame
-                compressobj = ZLibCompressor(
-                    level=zlib.Z_BEST_SPEED,
-                    wbits=-compress,
-                    max_sync_chunk_size=WEBSOCKET_MAX_SYNC_CHUNK_SIZE,
-                )
+                compressobj = self._make_compress_obj(compress)
+                message = await compressobj.compress(message)
+                self._write_compressed_message(message, opcode, compressobj, rsv)
             else:  # self.compress
+                # If we are reusing the compress object, we need to hold a lock
+                # around the compress/flush/write to ensure that messages get
+                # compressed in order and takeover is not violated.
                 if not self._compressobj:
-                    self._compressobj = ZLibCompressor(
-                        level=zlib.Z_BEST_SPEED,
-                        wbits=-self.compress,
-                        max_sync_chunk_size=WEBSOCKET_MAX_SYNC_CHUNK_SIZE,
-                    )
+                    self._compressobj = self._make_compress_obj(self.compress)
                 compressobj = self._compressobj
+                if not self._compress_lock:
+                    self._compress_lock = asyncio.Lock()
+                async with self._compress_lock:
+                    message = await compressobj.compress(message)
+                    self._write_compressed_message(message, opcode, compressobj, rsv)
 
-            message = await compressobj.compress(message)
-            message += compressobj.flush(
-                zlib.Z_FULL_FLUSH if self.notakeover else zlib.Z_SYNC_FLUSH
-            )
-            if message.endswith(_WS_DEFLATE_TRAILING):
-                message = message[:-4]
-            rsv = rsv | 0x40
+        else:
+            self._write_message(message, opcode, rsv)
 
+        if self._output_size > self._limit:
+            self._output_size = 0
+            await self.protocol._drain_helper()
+
+    def _make_compress_obj(self, compress: int) -> ZLibCompressor:
+        return ZLibCompressor(
+            level=zlib.Z_BEST_SPEED,
+            wbits=-compress,
+            max_sync_chunk_size=WEBSOCKET_MAX_SYNC_CHUNK_SIZE,
+        )
+
+    def _write_compressed_message(
+        self, message: bytes, opcode: int, compressobj: ZLibCompressor, rsv: int
+    ) -> None:
+        message += compressobj.flush(
+            zlib.Z_FULL_FLUSH if self.notakeover else zlib.Z_SYNC_FLUSH
+        )
+        if message.endswith(_WS_DEFLATE_TRAILING):
+            message = message[:-4]
+        rsv = rsv | 0x40
+        self._write_message(message, opcode, rsv)
+
+    def _write_message(self, message: bytes, opcode: int, rsv: int) -> None:
+        """Write a complete websocket frame to the transport."""
         msg_length = len(message)
 
         use_mask = self.use_mask
@@ -671,6 +693,7 @@ class WebSocketWriter:
             header = PACK_LEN2(0x80 | rsv | opcode, 126 | mask_bit, msg_length)
         else:
             header = PACK_LEN3(0x80 | rsv | opcode, 127 | mask_bit, msg_length)
+
         if use_mask:
             mask = self.randrange(0, 0xFFFFFFFF)
             mask = mask.to_bytes(4, "big")
@@ -678,18 +701,15 @@ class WebSocketWriter:
             _websocket_mask(mask, message)
             self._write(header + mask + message)
             self._output_size += len(header) + len(mask) + len(message)
+            return
+
+        if len(message) > MSG_SIZE:
+            self._write(header)
+            self._write(message)
         else:
-            if len(message) > MSG_SIZE:
-                self._write(header)
-                self._write(message)
-            else:
-                self._write(header + message)
+            self._write(header + message)
 
-            self._output_size += len(header) + len(message)
-
-        if self._output_size > self._limit:
-            self._output_size = 0
-            await self.protocol._drain_helper()
+        self._output_size += len(header) + len(message)
 
     def _write(self, data: bytes) -> None:
         if self.transport is None or self.transport.is_closing():
