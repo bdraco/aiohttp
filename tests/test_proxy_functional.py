@@ -79,7 +79,7 @@ async def secure_proxy_url(tls_certificate_pem_path):
     # We run the proxy in a subprocess since its not expected
     # to be run under pytest, and we do not want to test it for
     # warnings
-    def _make_process() -> subprocess.Popen[Any]:
+    def _make_process() -> subprocess.Popen:
         return subprocess.Popen(
             [sys.executable, "-m", "proxy", *proxypy_args],
             stdin=asyncio.subprocess.DEVNULL,
