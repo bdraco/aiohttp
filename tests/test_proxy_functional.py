@@ -1,5 +1,6 @@
 # type: ignore
 import asyncio
+import contextlib
 import functools
 import os
 import pathlib
@@ -109,7 +110,12 @@ async def secure_proxy_url(tls_certificate_pem_path):
         port=int(port),
     )
     proc.terminate()
-    await loop.run_in_executor(None, proc.communicate)
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        await loop.run_in_executor(
+            None, functools.partial(proc.communicate, timeout=0.5)
+        )
+    proc.kill()
+    await loop.run_in_executor(None, functools.partial(proc.communicate, timeout=1))
 
 
 @pytest.fixture
