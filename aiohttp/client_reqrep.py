@@ -1006,19 +1006,15 @@ class ClientResponse(HeadersMixin):
         if self._closed:
             return
 
-        if self._connection is not None:
-            # websocket, protocol could be None because
-            # connection could be detached
-            if (
-                self._connection.protocol is not None
-                and self._connection.protocol.upgraded
-            ):
-                return
-
-            self._release_connection()
+        # protocol could be None because connection could be detached
+        protocol = self._connection and self._connection.protocol
+        # Mypy bug: https://github.com/python/mypy/issues/16565
+        if protocol is not None and protocol.upgraded:  # type: ignore[union-attr]
+            return
 
         self._closed = True
         self._cleanup_writer()
+        self._release_connection()
 
     @property
     def closed(self) -> bool:
@@ -1113,8 +1109,11 @@ class ClientResponse(HeadersMixin):
         elif self._released:  # Response explicitly released
             raise ClientConnectionError("Connection closed")
 
-        await self._wait_released()  # Underlying connection released
-        return self._body  # type: ignore[no-any-return]
+        protocol = self._connection and self._connection.protocol
+        # Mypy bug: https://github.com/python/mypy/issues/16565
+        if protocol is None or not protocol.upgraded:  # type: ignore[union-attr]
+            await self._wait_released()  # Underlying connection released
+        return self._body
 
     def get_encoding(self) -> str:
         ctype = self.headers.get(hdrs.CONTENT_TYPE, "").lower()
