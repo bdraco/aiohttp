@@ -389,12 +389,13 @@ class WebSocketResponse(StreamResponse):
         self._eof_sent = True
 
     async def close(self, *, code: int = WSCloseCode.OK, message: bytes = b"") -> bool:
-        import pprint
+        # import pprint
 
-        pprint.pprint(["ws", id(self), "close"])
+        # pprint.pprint(["ws", id(self), "close"])
 
         self._cancel_heartbeat()
         reader = self._reader
+        self._req = None
         assert reader is not None
 
         # we need to break `receive()` cycle first,
@@ -404,6 +405,10 @@ class WebSocketResponse(StreamResponse):
             await self._waiting
 
         self._waiting = None
+        self._state = None
+        self._headers = None
+
+        # print(dir(self))
 
         if not self._closed:
             if self._writer is None:
