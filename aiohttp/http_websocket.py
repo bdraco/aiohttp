@@ -730,5 +730,5 @@ class WebSocketWriter:
         finally:
             self._closing = True
             self.transport.close()
-            # self.transport = None
-            # self.protocol = None
+            self.transport = None
+            self.protocol = None

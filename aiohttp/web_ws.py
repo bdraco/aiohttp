@@ -408,12 +408,15 @@ class WebSocketResponse(StreamResponse):
         if not self._closed:
             if self._writer is None:
                 raise RuntimeError("Call .prepare() first")
+            writer = self._writer
+            payload_writer = self._payload_writer
+            self._writer = None
+            self._payload_writer = None
             self._closed = True
             try:
-                await self._writer.close(code, message)
-                writer = self._payload_writer
-                assert writer is not None
-                await writer.drain()
+                await writer.close(code, message)
+                assert payload_writer is not None
+                await payload_writer.drain()
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 self._close_code = WSCloseCode.ABNORMAL_CLOSURE
                 raise
@@ -426,6 +429,7 @@ class WebSocketResponse(StreamResponse):
                 return True
 
             reader = self._reader
+            self._reader = None
             assert reader is not None
             try:
                 async with async_timeout.timeout(self._timeout):
