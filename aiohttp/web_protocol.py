@@ -307,7 +307,12 @@ class RequestHandler(BaseProtocol):
         self._manager.connection_made(self, real_transport)
 
     def connection_lost(self, exc: Optional[BaseException]) -> None:
+        import pprint
+
+        pprint.pprint(["connection_lost", exc, self._current_request])
         if self._manager is None:
+            pprint.pprint(["connection_lost", "sk"])
+
             return
         self._manager.connection_lost(self, exc)
 
@@ -324,14 +329,17 @@ class RequestHandler(BaseProtocol):
 
         if self._keepalive_handle is not None:
             self._keepalive_handle.cancel()
+            self._keepalive_handle = None
 
         if self._current_request is not None:
             if exc is None:
                 exc = ConnectionResetError("Connection lost")
             self._current_request._cancel(exc)
+            self._current_request = None
 
         if self._waiter is not None:
             self._waiter.cancel()
+            self._waiter = None
 
         if handler_cancellation and self._task_handler is not None:
             self._task_handler.cancel()
@@ -341,6 +349,14 @@ class RequestHandler(BaseProtocol):
         if self._payload_parser is not None:
             self._payload_parser.feed_eof()
             self._payload_parser = None
+
+        # if self.transport is not None:
+        #    self.transport.close()
+        #    self.transport = None
+
+        # self.logger = None
+        # self.access_log = None
+        # self.access_logger = None
 
     def set_parser(self, parser: Any) -> None:
         # Actual type is WebReader

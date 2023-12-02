@@ -170,12 +170,18 @@ class WebSocketResponse(StreamResponse):
         # make pre-check to don't hide it by do_handshake() exceptions
         if self._payload_writer is not None:
             return self._payload_writer
+        if self._closed:
+            raise ConnectionError("WebSocket connection is closed.")
 
         protocol, writer = self._pre_start(request)
         payload_writer = await super().prepare(request)
+        if self._closed:
+            raise ConnectionError("WebSocket connection is closed.")
         assert payload_writer is not None
         self._post_start(request, protocol, writer)
         await payload_writer.drain()
+        if self._closed:
+            raise ConnectionError("WebSocket connection is closed.")
         return payload_writer
 
     def _handshake(
@@ -340,25 +346,25 @@ class WebSocketResponse(StreamResponse):
         return self._exception
 
     async def ping(self, message: bytes = b"") -> None:
-        if self._writer is None:
+        if self._writer is None and not self._closed:
             raise RuntimeError("Call .prepare() first")
         await self._writer.ping(message)
 
     async def pong(self, message: bytes = b"") -> None:
         # unsolicited pong
-        if self._writer is None:
+        if self._writer is None and not self._closed:
             raise RuntimeError("Call .prepare() first")
         await self._writer.pong(message)
 
     async def send_str(self, data: str, compress: Optional[bool] = None) -> None:
-        if self._writer is None:
+        if self._writer is None and not self._closed:
             raise RuntimeError("Call .prepare() first")
         if not isinstance(data, str):
             raise TypeError("data argument must be str (%r)" % type(data))
         await self._writer.send(data, binary=False, compress=compress)
 
     async def send_bytes(self, data: bytes, compress: Optional[bool] = None) -> None:
-        if self._writer is None:
+        if self._writer is None and not self._closed:
             raise RuntimeError("Call .prepare() first")
         if not isinstance(data, (bytes, bytearray, memoryview)):
             raise TypeError("data argument must be byte-ish (%r)" % type(data))
@@ -383,8 +389,9 @@ class WebSocketResponse(StreamResponse):
         self._eof_sent = True
 
     async def close(self, *, code: int = WSCloseCode.OK, message: bytes = b"") -> bool:
-        if self._writer is None:
-            raise RuntimeError("Call .prepare() first")
+        import pprint
+
+        pprint.pprint(["ws", id(self), "close"])
 
         self._cancel_heartbeat()
         reader = self._reader
@@ -396,7 +403,11 @@ class WebSocketResponse(StreamResponse):
             reader.feed_data(WS_CLOSING_MESSAGE, 0)
             await self._waiting
 
+        self._waiting = None
+
         if not self._closed:
+            if self._writer is None:
+                raise RuntimeError("Call .prepare() first")
             self._closed = True
             try:
                 await self._writer.close(code, message)
@@ -438,7 +449,7 @@ class WebSocketResponse(StreamResponse):
             return False
 
     async def receive(self, timeout: Optional[float] = None) -> WSMessage:
-        if self._reader is None:
+        if self._reader is None and not self._closed:
             raise RuntimeError("Call .prepare() first")
 
         loop = self._loop
