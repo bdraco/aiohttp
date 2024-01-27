@@ -131,7 +131,7 @@ class FileResponse(StreamResponse):
         return await super().prepare(request)
 
     def _get_file_path_stat_and_gzip(
-        self, accept_encoding: str
+        self, accept_encoding: Optional[str]
     ) -> Tuple[pathlib.Path, os.stat_result, Optional[str]]:
         """Return the file path, stat result, and possible compression type.
 
@@ -139,8 +139,11 @@ class FileResponse(StreamResponse):
         since it calls os.stat which may block.
         """
         filepath = self._path
-        for encoding, extension in ENCODING_EXTENSION.items():
-            if encoding in accept_encoding:
+        if accept_encoding:
+            accept_encoding_lower = accept_encoding.lower()
+            for encoding, extension in ENCODING_EXTENSION.items():
+                if encoding not in accept_encoding_lower:
+                    continue
                 compressed_path = filepath.with_name(filepath.name + extension)
                 try:
                     return compressed_path, compressed_path.stat(), encoding
@@ -153,7 +156,7 @@ class FileResponse(StreamResponse):
 
     async def prepare(self, request: "BaseRequest") -> Optional[AbstractStreamWriter]:
         loop = asyncio.get_event_loop()
-        accept_encoding = request.headers.get(hdrs.ACCEPT_ENCODING, "").lower()
+        accept_encoding = request.headers.get(hdrs.ACCEPT_ENCODING)
         filepath, st, file_compression = await loop.run_in_executor(
             None, self._get_file_path_stat_and_gzip, accept_encoding
         )
