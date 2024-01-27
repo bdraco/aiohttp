@@ -3,7 +3,7 @@ import asyncio
 import pathlib
 import socket
 import zlib
-from typing import Any, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import pytest
 
@@ -225,13 +225,17 @@ async def test_static_file_custom_content_type(
 
 
 @pytest.mark.parametrize(
-    ("accept_encoding", "expect_encoding"),
-    [(None, "br"), ("gzip, deflate", "gzip")],
+    ("headers", "expect_encoding"),
+    [
+        ({}, "br"),  # aiohttp will use defaults if not set
+        ({"Accept-Encoding": "br, gzip, deflate"}, "br"),
+        ({"Accept-Encoding": "gzip, deflate"}, "gzip"),
+    ],
 )
 async def test_static_file_custom_content_type_compress(
     aiohttp_client: Any,
     sender: Any,
-    accept_encoding: Optional[str],
+    headers: Dict[str, str],
     expect_encoding: str,
 ):
     """Test static compressed files are returned with expected content type and encoding"""
@@ -246,9 +250,7 @@ async def test_static_file_custom_content_type_compress(
     app.router.add_get("/", handler)
     client = await aiohttp_client(app)
 
-    resp = await client.get(
-        "/", headers={"Accept-Encoding": accept_encoding} if accept_encoding else None
-    )
+    resp = await client.get("/", headers=headers)
     assert resp.status == 200
     body = await resp.read()
     assert b"hello aiohttp\n" == body
