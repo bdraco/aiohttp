@@ -156,7 +156,7 @@ pyjwt==2.3.0
     #   pyjwt
 pyparsing==2.4.7
     # via packaging
-pytest==8.0.0
+pytest==8.0.1
     # via
     #   -r requirements/lint.in
     #   -r requirements/test.in
