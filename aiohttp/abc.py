@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import socket
 from abc import ABC, abstractmethod
 from collections.abc import Sized
 from http.cookies import BaseCookie, Morsel
@@ -14,6 +15,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    TypedDict,
 )
 
 from multidict import CIMultiDict
@@ -119,11 +121,23 @@ class AbstractView(ABC):
         """Execute the view handler."""
 
 
+class ResolveResult(TypedDict):
+
+    hostname: str
+    host: str
+    port: int
+    family: int
+    proto: int
+    flags: int
+
+
 class AbstractResolver(ABC):
     """Abstract DNS resolver."""
 
     @abstractmethod
-    async def resolve(self, host: str, port: int, family: int) -> List[Dict[str, Any]]:
+    async def resolve(
+        self, host: str, port: int = 0, family: int = socket.AF_INET
+    ) -> List[ResolveResult]:
         """Return IP address for given hostname"""
 
     @abstractmethod

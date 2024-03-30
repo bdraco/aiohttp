@@ -32,7 +32,7 @@ from typing import (
 import attr
 
 from . import hdrs, helpers
-from .abc import AbstractResolver
+from .abc import AbstractResolver, ResolveResult
 from .client_exceptions import (
     ClientConnectionError,
     ClientConnectorCertificateError,
@@ -691,14 +691,14 @@ class BaseConnector:
 
 class _DNSCacheTable:
     def __init__(self, ttl: Optional[float] = None) -> None:
-        self._addrs_rr: Dict[Tuple[str, int], Tuple[Iterator[Dict[str, Any]], int]] = {}
+        self._addrs_rr: Dict[Tuple[str, int], Tuple[Iterator[ResolveResult], int]] = {}
         self._timestamps: Dict[Tuple[str, int], float] = {}
         self._ttl = ttl
 
     def __contains__(self, host: object) -> bool:
         return host in self._addrs_rr
 
-    def add(self, key: Tuple[str, int], addrs: List[Dict[str, Any]]) -> None:
+    def add(self, key: Tuple[str, int], addrs: List[ResolveResult]) -> None:
         self._addrs_rr[key] = (cycle(addrs), len(addrs))
 
         if self._ttl is not None:
@@ -714,7 +714,7 @@ class _DNSCacheTable:
         self._addrs_rr.clear()
         self._timestamps.clear()
 
-    def next_addrs(self, key: Tuple[str, int]) -> List[Dict[str, Any]]:
+    def next_addrs(self, key: Tuple[str, int]) -> List[ResolveResult]:
         loop, length = self._addrs_rr[key]
         addrs = list(islice(loop, length))
         # Consume one more element to shift internal state of `cycle`
@@ -824,7 +824,7 @@ class TCPConnector(BaseConnector):
 
     async def _resolve_host(
         self, host: str, port: int, traces: Optional[List["Trace"]] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ResolveResult]:
         """Resolve host and return list of addresses."""
         if is_ip_address(host):
             return [
@@ -880,7 +880,7 @@ class TCPConnector(BaseConnector):
             return await asyncio.shield(resolved_host_task)
         except asyncio.CancelledError:
 
-            def drop_exception(fut: "asyncio.Future[List[Dict[str, Any]]]") -> None:
+            def drop_exception(fut: "asyncio.Future[List[ResolveResult]]") -> None:
                 with suppress(Exception, asyncio.CancelledError):
                     fut.result()
 
@@ -893,7 +893,7 @@ class TCPConnector(BaseConnector):
         host: str,
         port: int,
         traces: Optional[List["Trace"]],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[ResolveResult]:
         """Resolve host with a dns events throttle."""
         if key in self._throttle_dns_events:
             # get event early, before any await (#4014)
