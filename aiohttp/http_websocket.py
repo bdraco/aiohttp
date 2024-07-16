@@ -454,7 +454,7 @@ class WebSocketReader:
 
         while True:
             # read header
-            if self._state == WSParserState.READ_HEADER:
+            if self._state is WSParserState.READ_HEADER:
                 if buf_length - start_pos >= 2:
                     data = buf[start_pos : start_pos + 2]
                     start_pos += 2
@@ -519,7 +519,7 @@ class WebSocketReader:
                     break
 
             # read payload length
-            if self._state == WSParserState.READ_PAYLOAD_LENGTH:
+            if self._state is WSParserState.READ_PAYLOAD_LENGTH:
                 length = self._payload_length_flag
                 if length == 126:
                     if buf_length - start_pos >= 2:
@@ -556,7 +556,7 @@ class WebSocketReader:
                     )
 
             # read payload mask
-            if self._state == WSParserState.READ_PAYLOAD_MASK:
+            if self._state is WSParserState.READ_PAYLOAD_MASK:
                 if buf_length - start_pos >= 4:
                     self._frame_mask = buf[start_pos : start_pos + 4]
                     start_pos += 4
@@ -564,7 +564,7 @@ class WebSocketReader:
                 else:
                     break
 
-            if self._state == WSParserState.READ_PAYLOAD:
+            if self._state is WSParserState.READ_PAYLOAD:
                 length = self._payload_length
                 payload = self._frame_payload
 
