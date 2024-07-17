@@ -721,8 +721,15 @@ class ClientRequest:
             self.method, path, v=self.version
         )
         await writer.write_headers(status_line, self.headers)
+        coro = self.write_bytes(writer, conn)
 
-        self._writer = self.loop.create_task(self.write_bytes(writer, conn))
+        if sys.version_info >= (3, 12):
+            # Optimization for Python 3.12, try to write
+            # bytes immediately to avoid having to schedule
+            # the task on the event loop.
+            self._writer = asyncio.Task(coro, loop=self.loop, eager_start=True)
+        else:
+            self._writer = self.loop.create_task(coro)
 
         response_class = self.response_class
         assert response_class is not None
