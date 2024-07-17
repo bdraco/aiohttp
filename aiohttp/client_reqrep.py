@@ -727,10 +727,11 @@ class ClientRequest:
             # Optimization for Python 3.12, try to write
             # bytes immediately to avoid having to schedule
             # the task on the event loop.
-            self._writer = asyncio.Task(coro, loop=self.loop, eager_start=True)
+            task = asyncio.Task(coro, loop=self.loop, eager_start=True)
         else:
-            self._writer = self.loop.create_task(coro)
+            task = self.loop.create_task(coro)
 
+        self._writer = task
         response_class = self.response_class
         assert response_class is not None
         self.response = response_class(
