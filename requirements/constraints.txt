@@ -233,7 +233,7 @@ tomli==1.2.2
     #   pytest
     #   slotscheck
     #   towncrier
-towncrier==24.7.1
+towncrier==24.8.0
     # via
     #   -r requirements/doc.in
     #   sphinxcontrib-towncrier
