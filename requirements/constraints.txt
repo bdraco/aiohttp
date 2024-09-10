@@ -104,7 +104,7 @@ jinja2==3.0.3
     #   towncrier
 markupsafe==2.0.1
     # via jinja2
-multidict==6.0.5
+multidict==6.1.0
     # via
     #   -r requirements/multidict.in
     #   -r requirements/runtime-deps.in
@@ -248,6 +248,7 @@ typing-extensions==4.7.1
     #   -r requirements/typing-extensions.in
     #   aioredis
     #   annotated-types
+    #   multidict
     #   mypy
     #   pydantic
     #   pydantic-core
