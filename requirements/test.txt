@@ -49,7 +49,7 @@ idna==3.4
     #   yarl
 iniconfig==2.0.0
     # via pytest
-multidict==6.0.5
+multidict==6.1.0
     # via
     #   -r requirements/runtime-deps.in
     #   yarl
@@ -113,6 +113,7 @@ typing-extensions==4.7.1
     # via
     #   -r requirements/typing-extensions.in
     #   annotated-types
+    #   multidict
     #   mypy
     #   pydantic
     #   pydantic-core
