@@ -198,6 +198,24 @@ async def test_response_before_complete(aiohttp_client: AiohttpClient) -> None:
 
 @pytest.mark.skipif(sys.version_info < (3, 11), reason="Needs Task.cancelling()")
 async def test_cancel_shutdown(aiohttp_client: AiohttpClient) -> None:
+    loop = asyncio.get_running_loop()
+    ready_to_shutdown: asyncio.Future[RequestHandler] = loop.create_future()
+    shutdown_finished: asyncio.Future[None] = loop.create_future()
+
+    async def wait_and_shutdown() -> None:
+        protocol = await ready_to_shutdown
+        t = asyncio.create_task(protocol.shutdown())
+        await asyncio.sleep(0)
+
+        t.cancel()
+        # Cancellation should not be suppressed
+        with pytest.raises(asyncio.CancelledError):
+            await t
+
+        shutdown_finished.set_result(None)
+
+    shutdown_task = asyncio.create_task(wait_and_shutdown())
+
     async def handler(request: web.Request) -> web.Response:
         t = asyncio.create_task(request.protocol.shutdown())
         # Ensure it's started waiting
@@ -209,15 +227,11 @@ async def test_cancel_shutdown(aiohttp_client: AiohttpClient) -> None:
             await t
 
         # Repeat for second waiter in shutdown()
-        with mock.patch.object(request.protocol, "_request_in_progress", False):
-            with mock.patch.object(request.protocol, "_current_request", None):
-                t = asyncio.create_task(request.protocol.shutdown())
-                await asyncio.sleep(0)
+        # shutdown will cancel the handler so
+        # we do the shutdown in a separate task
+        ready_to_shutdown.set_result(request.protocol)
 
-                t.cancel()
-                with pytest.raises(asyncio.CancelledError):
-                    await t
-
+        await shutdown_finished
         return web.Response(body=b"OK")
 
     app = web.Application()
@@ -228,6 +242,8 @@ async def test_cancel_shutdown(aiohttp_client: AiohttpClient) -> None:
         assert resp.status == 200
         txt = await resp.text()
         assert txt == "OK"
+
+    await shutdown_task
 
 
 async def test_post_form(aiohttp_client: AiohttpClient) -> None:
